@@ -36,7 +36,7 @@ def handle_webhook():
         return jsonify({'status': 'success'}), 200
     except subprocess.CalledProcessError as e:
         # If the script fails, log the error
-        print(f"Deployment failed:\n{e.stderr}")
+        print(f"Deployment failed:\nSTDOUT:\n{e.stdout}\n\nSTDERR:\n{e.stderr}")
         return jsonify({'status': 'error', 'message': e.stderr}), 500
     except Exception as e:
         print(f"An error occurred: {str(e)}")
