@@ -13,6 +13,6 @@ sudo /usr/local/bin/docker build -t myapp:latest .
 sudo /usr/local/bin/docker stop myapp || true
 
 # 4. Run the new container (with sudo)
-sudo /usr/local/bin/docker run -d --rm --name myapp -p 8080:8080 myapp:latest
+sudo /usr/local/bin/docker run -d --name myapp -p 8080:5000 myapp:latest
 
 echo "Deployment successful!"
