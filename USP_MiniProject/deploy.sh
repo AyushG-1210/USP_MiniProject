@@ -7,12 +7,12 @@ echo "Starting deployment..."
 git pull origin main
 
 # 2. Build the new Docker image (with sudo)
-sudo /usr/bin/docker build -t myapp:latest .
+sudo /mnt/c/Program Files/Docker/Docker/resources/bin/docker build -t myapp:latest .
 
 # 3. Stop the old container (with sudo)
-sudo /usr/bin/docker stop myapp || true
+sudo /mnt/c/Program Files/Docker/Docker/resources/bin/docker stop myapp || true
 
 # 4. Run the new container (with sudo)
-sudo /usr/bin/docker run -d --rm --name myapp -p 8080:8080 myapp:latest
+sudo /mnt/c/Program Files/Docker/Docker/resources/bin/docker run -d --rm --name myapp -p 8080:8080 myapp:latest
 
 echo "Deployment successful!"
