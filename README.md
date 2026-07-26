@@ -1,6 +1,9 @@
 # PINN-Ops: Low-Latency SciML Inference Engine with GitOps Continuous Validation
 
-![PINN Inference Interface Demo](frontend/Demo.mp4)
+<video controls autoplay loop muted playsinline width="100%">
+  <source src="frontend/Demo.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
 
 A production-ready inference service for a Physics-Informed Neural Network (PINN) spatiotemporal surrogate model. The stack combines a TorchScript-compiled PyTorch model, a multi-worker FastAPI/ASGI serving layer, a hardened non-root Docker container, and a GitHub Actions CI pipeline that treats performance as a blocking regression gate.
 
