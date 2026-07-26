@@ -1,6 +1,6 @@
 # PINN-Ops: Low-Latency SciML Inference Engine with GitOps Continuous Validation
 
-![PINN Inference Interface Demo](frontend/Demo.gif)
+![PINN Inference Interface Demo](frontend/Demo.mp4)
 
 A production-ready inference service for a Physics-Informed Neural Network (PINN) spatiotemporal surrogate model. The stack combines a TorchScript-compiled PyTorch model, a multi-worker FastAPI/ASGI serving layer, a hardened non-root Docker container, and a GitHub Actions CI pipeline that treats performance as a blocking regression gate.
 
@@ -99,7 +99,7 @@ Verified under full parallel load across concurrent thread arrays on the product
 │   ├── index.html              # UI layout
 │   ├── app.js                  # API fetch and render logic
 │   ├── style.css               # Styling
-│   └── Demo.gif                # Interface demo
+│   └── Demo.mp4                # Interface demo
 ├── server.py                   # FastAPI app — validation, JIT inference, static serving
 ├── load_server.py              # Parallel stress test and tail latency reporter
 ├── Dockerfile                  # Non-root Alpine multi-worker image

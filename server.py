@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import torch
 import torch.nn as nn
 from contextlib import asynccontextmanager
@@ -45,9 +45,9 @@ app = FastAPI(lifespan=lifespan)
 
 # 3. Input Validation Schema
 class CoordinateInput(BaseModel):
-    x: float
-    y: float
-    t: float
+    x: float = Field(..., ge=0.0, le=1.0, description="Spatial coordinate x in [0, 1]")
+    y: float = Field(..., ge=0.0, le=1.0, description="Spatial coordinate y in [0, 1]")
+    t: float = Field(..., ge=0.0, le=1.0, description="Temporal coordinate t in [0, 1]")
 
 # 4. Inference Endpoint
 @app.post("/predict")
