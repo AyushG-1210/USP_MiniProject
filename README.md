@@ -123,19 +123,21 @@ These are end-to-end HTTP round-trip numbers (network + Pydantic validation + JI
 ```
 ├── .github/
 │   └── workflows/
-│       └── ci.yml              # CI performance validation pipeline
+│       └── ci.yml                    # CI performance validation pipeline
+├── PINN/
+│   └── fastvpinn_2d_heat.py          # CI performance validation pipeline
 ├── frontend/
-│   ├── index.html              # UI layout
-│   ├── app.js                  # Single-point prediction: fetch + render logic
-│   ├── plotter.js               # Batch prediction + Chart.js trend visualization
-│   ├── style.css               # Styling
-│   └── Demo.gif                 # Interface demo
-├── server.py                   # FastAPI app — validation, JIT inference, static serving
-├── load_server.py              # Parallel stress test and tail latency reporter
-├── Dockerfile                  # Non-root Alpine multi-worker image
-├── model_fastvpinn.pt          # Serialized model weights (see Model Weights below)
-├── FastVPINN_Project_Reference.md   # Full derivation + debugging journal for the model
-└── requirements.txt              # Version-locked Python dependencies
+│   ├── index.html                    # UI layout
+│   ├── app.js                        # Single-point prediction: fetch + render logic
+│   ├── plotter.js                    # Batch prediction + Chart.js trend visualization
+│   ├── style.css                     # Styling
+│   └── Demo.gif                      # Interface demo
+├── server.py                         # FastAPI app — validation, JIT inference, static serving
+├── load_server.py                    # Parallel stress test and tail latency reporter
+├── Dockerfile                        # Non-root Alpine multi-worker image
+├── model_fastvpinn.pt                # Serialized model weights (see Model Weights below)
+├── FastVPINN_Project_Reference.md    # Full derivation + debugging journal for the model
+└── requirements.txt                  # Version-locked Python dependencies
 ```
 
 ---
