@@ -1,6 +1,39 @@
-device = torch.device("cpu")
-
 let predictionChart;
+
+const MATERIALS = {
+    copper: { diffusivity: 1.1e-4, label: 'Copper' },
+    aluminum: { diffusivity: 8.6e-5, label: 'Aluminum' },
+    steel: { diffusivity: 1.5e-6, label: 'Steel' },
+    silicon: { diffusivity: 8.8e-5, label: 'Silicon' }
+};
+
+function getPhysicalSettings() {
+    const material = document.getElementById('material-select').value;
+    const lengthScale = parseFloat(document.getElementById('plate-size').value);
+    const baseline = parseFloat(document.getElementById('baseline-temp').value);
+    const deltaTemp = parseFloat(document.getElementById('delta-temp').value);
+
+    return { material, lengthScale, baseline, deltaTemp };
+}
+
+function convertToPhysicalForChart(rawValue, x, y, t, settings) {
+    const material = MATERIALS[settings.material] ?? MATERIALS.copper;
+    const tau = (settings.lengthScale ** 2) / material.diffusivity;
+    const tReal = tau * t;
+    const uReal = settings.baseline + settings.deltaTemp * rawValue;
+
+    return {
+        rawValue,
+        tReal,
+        uReal
+    };
+}
+
+function describeSelectedPhysics(settings) {
+    const material = MATERIALS[settings.material] ?? MATERIALS.copper;
+    const tau = (settings.lengthScale ** 2) / material.diffusivity;
+    return `Using ${material.label}, plate length L = ${settings.lengthScale.toFixed(3)} m, base temperature u_ref = ${settings.baseline.toFixed(1)} °C, temperature scale ΔT = ${settings.deltaTemp.toFixed(1)} °C, so one model-time unit corresponds to about ${tau.toFixed(2)} s in physical time.`;
+}
 
 function buildBatchInputsFromUser() {
     const x = parseFloat(document.getElementById('input-x').value);
@@ -23,15 +56,19 @@ function buildBatchInputsFromUser() {
         const ratio = i / (stepCount - 1);
 
         batchInputs.push({
-            x: x + (1.0 - x) * ratio,
-            y: y + (1.0 - y) * ratio,
+            x,
+            y,
             t: t + (1.0 - t) * ratio
         });
     }
 
+    const settings = getPhysicalSettings();
+
     if (noteElement) {
         noteElement.textContent =
-            `Graphing from your inputs (${x.toFixed(2)}, ${y.toFixed(2)}, ${t.toFixed(2)}) and stepping them evenly to 1.0 for x, y, and t.`;
+            `The graph follows a time sweep from your entered model-time point up to the end of the normalized domain. ` +
+            `Here x and y stay fixed, while t changes from ${t.toFixed(4)} to 1.0 in the model coordinate system. ` +
+            describeSelectedPhysics(settings);
     }
 
     return batchInputs;
@@ -60,11 +97,16 @@ async function runBatchPrediction() {
         const data = JSON.parse(rawText);
         const predictions = Array.isArray(data.predictions) ? data.predictions : [];
 
-        const results = predictions.map((value, i) => ({
-            step: i + 1,
-            input: batchInputs[i],
-            output: Number(value)
-        }));
+        const settings = getPhysicalSettings();
+        const results = predictions.map((value, i) => {
+            const current = batchInputs[i];
+            const physical = convertToPhysicalForChart(Number(value), current.x, current.y, current.t, settings);
+            return {
+                step: i + 1,
+                input: current,
+                output: physical.uReal
+            };
+        });
 
         renderChart(results);
 
@@ -77,10 +119,21 @@ async function runBatchPrediction() {
 }
 
 function renderChart(results) {
-    const labels = results.map(item => `Step ${item.step}`);
-    const values = results.map(item => item.output);
-
     const ctx = document.getElementById('predictionChart');
+
+    if (!ctx) {
+        return;
+    }
+
+    const settings = getPhysicalSettings();
+    const material = MATERIALS[settings.material] ?? MATERIALS.copper;
+    const tau = (settings.lengthScale ** 2) / material.diffusivity;
+
+    const labels = results.map((item) => {
+        const t = item.input.t;
+        return `${t.toFixed(2)} → ${(tau * t).toFixed(0)} s`;
+    });
+    const values = results.map(item => item.output);
 
     if (predictionChart) {
         predictionChart.destroy();
@@ -91,7 +144,7 @@ function renderChart(results) {
         data: {
             labels,
             datasets: [{
-                label: 'Predicted Temperature',
+                label: 'Predicted temperature u(x, y, t) in °C',
                 data: values,
                 borderColor: '#0066cc',
                 backgroundColor: 'rgba(0, 102, 204, 0.15)',
@@ -102,19 +155,44 @@ function renderChart(results) {
         },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
             plugins: {
-                legend: { display: true }
+                legend: { display: true },
+                tooltip: {
+                    callbacks: {
+                        label: (context) => `${context.dataset.label}: ${context.parsed.y.toFixed(4)} °C`
+                    }
+                }
             },
             scales: {
-                y: { beginAtZero: false }
+                x: {
+                    title: { display: true, text: 'Model time t → physical time' },
+                    ticks: {
+                        autoSkip: true,
+                        maxTicksLimit: 6,
+                        maxRotation: 45,
+                        minRotation: 45
+                    }
+                },
+                y: {
+                    beginAtZero: false,
+                    title: { display: true, text: 'Temperature (°C)' },
+                    ticks: {
+                        precision: 1
+                    }
+                }
             }
         }
     });
 }
 
-window.addEventListener('DOMContentLoaded', () => {
+window.runBatchPrediction = runBatchPrediction;
+
+function initializeGraphUI() {
     const graphButton = document.getElementById('graph-button');
     if (graphButton) {
         graphButton.addEventListener('click', runBatchPrediction);
     }
-});
+}
+
+initializeGraphUI();

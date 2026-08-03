@@ -13,24 +13,53 @@
         <div class="badge">Engine: TorchScript Static Graph</div>
 
         <div class="input-group">
-            <label for="input-x">Spatial Coordinate (x)</label>
+            <label for="input-x">Horizontal position x</label>
+            <div class="field-help">Normalized plate coordinate in the horizontal direction, from 0 to 1.</div>
             <input type="number" id="input-x" step="0.0001" min="0" max="1" value="0.5">
         </div>
         <div class="input-group">
-            <label for="input-y">Spatial Coordinate (y)</label>
+            <label for="input-y">Vertical position y</label>
+            <div class="field-help">Normalized plate coordinate in the vertical direction, from 0 to 1.</div>
             <input type="number" id="input-y" step="0.0001" min="0" max="1" value="0.5">
         </div>
         <div class="input-group">
-            <label for="input-t">Temporal Dimension (t)</label>
+            <label for="input-t">Model time t</label>
+            <div class="field-help">Normalized time input for the PINN. This is converted to physical time using the selected material.</div>
             <input type="number" id="input-t" step="0.0001" min="0" max="1" value="0.1">
         </div>
+        <div class="input-group">
+            <label for="material-select">Material / thermal diffusivity</label>
+            <div class="field-help">Changes the material's diffusivity, which changes the conversion from model-time units to real time.</div>
+            <select id="material-select" onchange="window.handlePredict()">
+                <option value="copper">Copper</option>
+                <option value="aluminum">Aluminum</option>
+                <option value="steel">Steel</option>
+                <option value="silicon">Silicon</option>
+            </select>
+        </div>
+        <div class="input-group">
+            <label for="plate-size">Plate length L</label>
+            <div class="field-help">Characteristic plate size in meters. Used to map normalized coordinates to physical space.</div>
+            <input type="number" id="plate-size" step="0.001" min="0.001" value="0.1">
+        </div>
+        <div class="input-group">
+            <label for="baseline-temp">Reference temperature u_ref</label>
+            <div class="field-help">The baseline temperature in °C that is added to the model output before reporting.</div>
+            <input type="number" id="baseline-temp" step="0.1" value="20">
+        </div>
+        <div class="input-group">
+            <label for="delta-temp">Temperature scale ΔT</label>
+            <div class="field-help">The temperature amplitude in °C used to convert the normalized PINN output back to a physical temperature.</div>
+            <input type="number" id="delta-temp" step="0.1" value="80">
+        </div>
 
-        <button id="predict-button" type="button">Compute Inference</button>
-        <button id="graph-button" type="button" style="margin-top: 12px;">Create Graph</button>
+        <button id="predict-button" type="button" onclick="window.handlePredict(event)">Compute Inference</button>
+        <button id="graph-button" type="button" style="margin-top: 12px;" onclick="window.runBatchPrediction()">Create Graph</button>
 
         <div class="result" id="resultBox">
             <div class="result-title">Predicted Temperature</div>
             <div class="result-value" id="result-display">0.000000</div>
+            <div class="result-meta" id="result-meta">Raw model output shown in dimensionless units</div>
         </div>
 
         <div id="error-display"></div>
@@ -38,7 +67,7 @@
         <canvas id="predictionChart" height="120" style="margin-top: 20px;"></canvas>
 
         <p id="graph-note" class="graph-note">
-            The graph starts from your entered values and steps x, y, and t evenly to 1.0.
+            The graph keeps x and y fixed and sweeps the model time t from your chosen start point toward 1.0. The chart then converts that model-time path into a physical-time axis using the selected material and plate size.
         </p>
     </div>
 
