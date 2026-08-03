@@ -6,6 +6,8 @@ import torch
 import torch.nn as nn
 from contextlib import asynccontextmanager
 from fastapi.responses import JSONResponse
+from typing import List
+import uvicorn
 
 torch.set_default_dtype(torch.float64)
 
@@ -36,7 +38,7 @@ class FCN(nn.Module):
 
 # Global variables for model state
 model = None
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cpu")
 
 # 2. Server Lifespan Configuration (Boot Sequence)
 @asynccontextmanager
@@ -65,18 +67,37 @@ class CoordinateInput(BaseModel):
     y: float = Field(..., ge=0.0, le=1.0, description="Spatial coordinate y in [0, 1]")
     t: float = Field(..., ge=0.0, le=1.0, description="Temporal coordinate t in [0, 1]")
 
+class BatchCoordinateInput(BaseModel):
+    points: List[CoordinateInput]
+
 # 4. Inference Endpoint
 @app.post("/predict")
 async def predict(data: CoordinateInput):
     if model is None:
         return JSONResponse(status_code=503, content={"detail": "Model not loaded"})
 
-    input_tensor = torch.tensor([[data.x, data.y, data.t]], dtype=torch.float64).to(device)
+    input_tensor = torch.tensor([[data.x, data.y, data.t]], dtype=torch.float64, device=device)
 
     with torch.no_grad():
         prediction = model(input_tensor)
 
     return JSONResponse(content={"predicted_temperature": float(prediction.item())})
 
+@app.post("/predict-batch")
+async def predict_batch(data: BatchCoordinateInput):
+    if model is None:
+        return JSONResponse(status_code=503, content={"detail": "Model not loaded"})
+
+    coords = [[point.x, point.y, point.t] for point in data.points]
+    input_tensor = torch.tensor(coords, dtype=torch.float64, device=device)
+
+    with torch.no_grad():
+        predictions = model(input_tensor).cpu().numpy().flatten().tolist()
+
+    return JSONResponse(content={"predictions": predictions})
+
 # Mount the frontend directory to serve static assets at the root path
 app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
+
+if __name__ == "__main__":
+    uvicorn.run("server:app", host="127.0.0.1", port=8000, workers=4)

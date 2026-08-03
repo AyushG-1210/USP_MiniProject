@@ -1,15 +1,6 @@
+device = torch.device("cpu")
+
 let predictionChart;
-
-async function queryPrediction(input) {
-    const response = await fetch('/predict', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(input)
-    });
-
-    const data = await response.json();
-    return Number(data.predicted_temperature);
-}
 
 function buildBatchInputsFromUser() {
     const x = parseFloat(document.getElementById('input-x').value);
@@ -53,18 +44,36 @@ async function runBatchPrediction() {
         return;
     }
 
-    const results = [];
+    try {
+        const response = await fetch('/predict-batch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ points: batchInputs })
+        });
 
-    for (let i = 0; i < batchInputs.length; i++) {
-        const value = await queryPrediction(batchInputs[i]);
-        results.push({
+        const rawText = await response.text();
+
+        if (!response.ok) {
+            throw new Error(`Batch computation failed: ${rawText}`);
+        }
+
+        const data = JSON.parse(rawText);
+        const predictions = Array.isArray(data.predictions) ? data.predictions : [];
+
+        const results = predictions.map((value, i) => ({
             step: i + 1,
             input: batchInputs[i],
-            output: value
-        });
-    }
+            output: Number(value)
+        }));
 
-    renderChart(results);
+        renderChart(results);
+
+    } catch (error) {
+        const noteElement = document.getElementById('graph-note');
+        if (noteElement) {
+            noteElement.textContent = error.message;
+        }
+    }
 }
 
 function renderChart(results) {
@@ -94,14 +103,10 @@ function renderChart(results) {
         options: {
             responsive: true,
             plugins: {
-                legend: {
-                    display: true
-                }
+                legend: { display: true }
             },
             scales: {
-                y: {
-                    beginAtZero: false
-                }
+                y: { beginAtZero: false }
             }
         }
     });
