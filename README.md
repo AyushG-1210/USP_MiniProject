@@ -3,7 +3,7 @@
 ![PINN Inference Interface Demo](frontend/Demo.gif)
 
 A production inference service for a **weak-form (variational) Physics-Informed Neural
-Network** — a spatiotemporal PDE surrogate trained using a FastVPINN-style tensor-
+Network** — a spatio-temporal PDE surrogate trained using a FastVPINN-style tensor-
 contraction formulation, served through a TorchScript-compiled, multi-worker FastAPI
 stack with CI-gated performance regression testing.
 
@@ -11,8 +11,7 @@ This isn't just a model wrapped in an API — the underlying network is trained 
 weak (variational) form of the 2D heat equation, using precomputed Legendre-polynomial
 test functions and Gauss-Legendre quadrature rather than raw pointwise collocation, so
 the model itself embeds a nontrivial piece of numerical PDE methodology, not just a
-generic regression fit. Full derivation and the debugging process behind it: see
-[`FastVPINN_Project_Reference.md`](FastVPINN_Project_Reference.md).
+generic regression fit.
 
 ---
 
@@ -72,76 +71,50 @@ API.
         {"predicted_temperature": float}
 ```
 
-### 1. The model: weak-form PINN, not a generic regressor
+### 1. The model: weak-form PINN
 
-The served model was trained by minimizing the **variational (weak) form** of the 2D
-heat equation — integrating the PDE residual against precomputed Legendre-difference
-test functions over a meshed domain, via Gauss-Legendre quadrature, rather than
-enforcing the PDE pointwise via second-order automatic differentiation. This trades a
-strong-form PINN's expensive Hessian computation for a single first-order pass plus a
-batched tensor contraction (`einsum`) against precomputed constants — cheaper to train,
-and in this project's testing, meaningfully more accurate at matched training budgets.
-See the reference doc for the full derivation, the test-function construction that
-makes this stable, and an honest account of what was and wasn't rigorously isolated in
-that comparison.
+The served model was trained by minimizing the **variational (weak) form** of the 2D heat equation — integrating the PDE residual against precomputed Legendre-difference test functions over a meshed domain, via Gauss-Legendre quadrature, rather than enforcing the PDE pointwise via second-order automatic differentiation. This trades a strong-form PINN's expensive Hessian computation for a single first-order pass plus a batched tensor contraction (`einsum`) against precomputed constants — cheaper to train, and in this project's testing, meaningfully more accurate at matched training budgets.
 
-### 2. Compiled inference core
+### 2. Physical dimensional conversion
 
-At startup, the trained model is loaded and trace-compiled via TorchScript JIT
-(`torch.jit.trace` + `torch.jit.freeze`) against a dummy coordinate tensor. This
-produces a static, serialized computation graph: once compiled, the forward pass no
-longer re-interprets Python-level model code on every call, reducing per-request
-overhead compared to eager-mode execution. (Note: this reduces *Python graph
-re-interpretation* overhead specifically — it does not remove the interpreter/GIL from
-the request-handling process itself, since the traced module is still invoked from
-within Python/Uvicorn.)
+While the core neural network operates over non-dimensional normalized domain bounds $(x, y, t) \in [0,1]^3$, the frontend client layer dynamically converts dimensionless model outputs into physical engineering quantities:
+* **Spatial Scaling**: $x_{\text{real}} = L \cdot x$, $y_{\text{real}} = L \cdot y$
+* **Temporal Scaling**: $t_{\text{real}} = \tau \cdot t$ where $\tau = \frac{L^2}{\alpha}$ (using material thermal diffusivity $\alpha$)
+* **Temperature Scaling**: $u_{\text{real}} = u_{\text{ref}} + \Delta T \cdot u$
 
-### 3. Async serving layer
+### 3. Compiled inference core
 
-FastAPI on Uvicorn's ASGI server, running four parallel worker processes to use
-available CPU cores concurrently. Incoming JSON payloads `(x, y, t)` are validated by a
-strict Pydantic model (`ge=0.0, le=1.0` on every coordinate) before reaching the
-inference engine — the model has no accuracy guarantees outside its trained domain, so
-this is a real correctness boundary, not just input hygiene.
+At startup, the trained model is loaded and trace-compiled via TorchScript JIT (`torch.jit.trace` + `torch.jit.freeze`) against a dummy coordinate tensor. This produces a static, serialized computation graph: once compiled, the forward pass no longer re-interprets Python-level model code on every call, reducing per-request overhead compared to eager-mode execution.
 
-### 4. Hardened container
+### 4. Async serving layer & batching
 
-Runs on an Alpine Linux base image. A dedicated `appuser` group/user is created at build
-time, with root dropped entirely before the Uvicorn runtime starts and build tooling
-stripped from the final image — standard container-hardening practice, reducing the
-attack surface available to any request-level exploit.
+FastAPI on Uvicorn's ASGI server, running four parallel worker processes to use available CPU cores concurrently. Includes dedicated `/predict-batch` endpoints for vectorizing multi-point time sweeps in a single forward pass, eliminating HTTP waterfall delays. Incoming JSON payloads are strictly validated by Pydantic schemas (`ge=0.0, le=1.0`).
 
-### 5. GitOps continuous validation
+### 5. Hardened container
 
-Performance is a first-class regression test, not a manual afterthought. Every push to
-`main` triggers a GitHub Actions run that:
+Runs on an Alpine Linux base image. A dedicated `appuser` group/user is created at build time, with root dropped entirely before the Uvicorn runtime starts and build tooling stripped from the final image.
 
+### 6. GitOps continuous validation
+
+Performance is a first-class regression test. Every push to `main` triggers a GitHub Actions run that:
 1. Builds a clean container image from scratch
 2. Launches the container and waits for JIT warmup across all workers
-3. Runs `load_server.py` — a multi-threaded stress test tracking full latency
-   distributions, not just averages
+3. Runs `load_server.py` — a multi-threaded stress test tracking full latency distributions
 4. Compares p95/p99 tail latency and throughput against fixed quality gates
 5. Fails the build and blocks the merge if any gate is breached
-
-Config lives in `.github/workflows/ci.yml`.
 
 ---
 
 ## Performance Benchmarks
 
-*(Figures below are from the last verified run committed to this repo — update this
-table when you have new load-test results.)*
-
 | Metric | Result | Gate | Status |
 | :--- | :---: | :---: | :---: |
-| Sustained Throughput | 616.52 req/s | > 100 req/s | ✅ Passed |
-| p95 Tail Latency | 21.05 ms | < 100 ms | ✅ Passed |
-| p99 Tail Latency | 24.49 ms | < 150 ms | ✅ Passed |
-| Transaction Success Rate | 100.0% | 100.0% | ✅ Passed |
+| Sustained Throughput | **829.23 req/s** | > 100 req/s | ✅ Passed |
+| p95 Tail Latency | **16.57 ms** | < 100 ms | ✅ Passed |
+| p99 Tail Latency | **19.26 ms** | < 150 ms | ✅ Passed |
+| Transaction Success Rate | **100.0%** | 100.0% | ✅ Passed |
 
-These are end-to-end HTTP round-trip numbers (network + validation + inference), not
-isolated model forward-pass time — worth keeping that distinction in mind if you ever
-quote a "per-inference" latency figure separately.
+These are end-to-end HTTP round-trip numbers (network + Pydantic validation + JIT inference) measured under concurrent multi-threaded stress testing.
 
 ---
 
@@ -208,10 +181,7 @@ report.
 `model_fastvpinn.pt` holds the trained weights for a PINN surrogate predicting
 spatiotemporal temperature fields `u(x, y, t)` over the unit domain `[0,1]³`, trained
 via the weak-form FastVPINN methodology described in
-[`FastVPINN_Project_Reference.md`](FastVPINN_Project_Reference.md). The model was
-trained separately and committed as a binary artifact; it's loaded as a plain
-`state_dict` and JIT-compiled at container startup (see `server.py`'s `lifespan`
-handler).
+
 
 **If you retrain or swap in a different model:** make sure the saved artifact matches
 what `server.py` expects — a `state_dict` from `torch.save(model.state_dict(), path)`,
@@ -239,10 +209,3 @@ Threshold constants live at the top of `load_server.py`; the trigger branch is s
 `ci.yml`'s `on: push: branches:` field.
 
 ---
-
-## Further reading
-
-For the actual numerical methods behind the served model — the weak-form derivation,
-the quadrature and test-function choices, the loss-weighting pitfalls hit along the
-way, and an honest account of what was and wasn't rigorously verified — see
-[`FastVPINN_Project_Reference.md`](FastVPINN_Project_Reference.md).
