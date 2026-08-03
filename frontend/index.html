@@ -1,36 +1,48 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PINN Inference Server</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="container">
         <h2>PINN Inference Interface</h2>
         <div class="badge">Engine: TorchScript Static Graph</div>
-        
+
         <div class="input-group">
-            <label for="x">Spatial Coordinate (x)</label>
-            <input type="number" id="x" step="0.0001" min="0" max="1" value="0.5">
+            <label for="input-x">Spatial Coordinate (x)</label>
+            <input type="number" id="input-x" step="0.0001" min="0" max="1" value="0.5">
         </div>
         <div class="input-group">
-            <label for="y">Spatial Coordinate (y)</label>
-            <input type="number" id="y" step="0.0001" min="0" max="1" value="0.5">
+            <label for="input-y">Spatial Coordinate (y)</label>
+            <input type="number" id="input-y" step="0.0001" min="0" max="1" value="0.5">
         </div>
         <div class="input-group">
-            <label for="t">Temporal Dimension (t)</label>
-            <input type="number" id="t" step="0.0001" min="0" max="1" value="0.1">
+            <label for="input-t">Temporal Dimension (t)</label>
+            <input type="number" id="input-t" step="0.0001" min="0" max="1" value="0.1">
         </div>
-        
-        <button onclick="getPrediction()">Compute Inference</button>
-        
+
+        <button id="predict-button" type="button">Compute Inference</button>
+        <button id="graph-button" type="button" style="margin-top: 12px;">Create Graph</button>
+
         <div class="result" id="resultBox">
             <div class="result-title">Predicted Temperature</div>
-            <div class="result-value" id="tempValue">0.000000</div>
+            <div class="result-value" id="result-display">0.000000</div>
         </div>
+
+        <div id="error-display"></div>
+
+        <canvas id="predictionChart" height="120" style="margin-top: 20px;"></canvas>
+
+        <p id="graph-note" class="graph-note">
+            The graph starts from your entered values and steps x, y, and t evenly to 1.0.
+        </p>
     </div>
+
     <script src="app.js"></script>
+    <script src="plotter.js"></script>
 </body>
 </html>
