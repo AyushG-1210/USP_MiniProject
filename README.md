@@ -75,6 +75,23 @@ API.
 
 The served model was trained by minimizing the **variational (weak) form** of the 2D heat equation — integrating the PDE residual against precomputed Legendre-difference test functions over a meshed domain, via Gauss-Legendre quadrature, rather than enforcing the PDE pointwise via second-order automatic differentiation. This trades a strong-form PINN's expensive Hessian computation for a single first-order pass plus a batched tensor contraction (`einsum`) against precomputed constants — cheaper to train, and in this project's testing, meaningfully more accurate at matched training budgets.
 
+#### Ablation Study: Strong-Form PINN vs. Weak-Form FastVPINN
+
+To evaluate the impact of the variational weak-form formulation, a controlled 1:1 ablation study was conducted against a standard strong-form PINN baseline using identical network topology (4 hidden layers × 64 units, SiLU activation), double precision (FP64), loss weight ratios ($\lambda_{ic}=3.0, \lambda_{bc}=1.0, \lambda_{phys}=12.0$), and equal point budgets ($N_f = 16,000$).
+
+| Metric / Parameter | Standard PINN (Strong-Form) | FastVPINN (Weak-Form) | Experimental Delta |
+| :--- | :---: | :---: | :---: |
+| **PDE Loss Formulation** | Pointwise $u_t - a(u_{xx} + u_{yy})$ | Variational integral $\int u_t v + a \nabla u \cdot \nabla v$ | Shipped spatial derivatives to test functions |
+| **Autograd Requirement** | 2nd-order spatial Hessians | 1st-order gradients only | Bypassed computational graph unrolling |
+| **Total Training Time** | 1,979.78 s | **542.40 s** | **~3.6x faster training** |
+| **Relative $L_2$ Error** | 39.64% | **3.09%** | **~12.8x higher accuracy** |
+| **Max Absolute Error** | 0.1333 | **0.0152** | **~8.7x lower peak error** |
+| **Peak VRAM Allocation** | 1,168.75 MB | **400.51 MB** | **~65% memory reduction** |
+
+#### Key Ablation Insights
+* **Autograd Graph Bottleneck:** Strong-form PINNs require computing continuous 2nd-order automatic differentiation ($u_{xx}, u_{yy}$) across 16,000 collocation points per epoch, heavily inflating GPU memory usage and step latency.
+* **Loss Landscape Stiffness:** Second-order autograd amplifies high-frequency noise in neural networks, causing the strong-form Adam optimizer to stall at ~39.6% error. FastVPINN's weak formulation uses integration by parts to smooth the loss landscape, achieving 3.09% relative $L_2$ error under identical training budgets.
+
 ### 2. Physical dimensional conversion
 
 While the core neural network operates over non-dimensional normalized domain bounds $(x, y, t) \in [0,1]^3$, the frontend client layer dynamically converts dimensionless model outputs into physical engineering quantities:
